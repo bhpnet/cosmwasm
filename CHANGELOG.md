@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.11.0 (unreleased)
+
+**cosmwasm-std**
+
+- Add `time_nanos` to `BlockInfo` allowing access to high precision block times.
+
 ## 0.10.0 (2020-07-30)
 
 **all**
