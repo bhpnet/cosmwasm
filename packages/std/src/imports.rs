@@ -8,6 +8,7 @@ use crate::iterator::{Order, KV};
 use crate::memory::{alloc, build_region, consume_region, Region};
 use crate::serde::from_slice;
 use crate::traits::{Api, Querier, QuerierResult, ReadonlyStorage, Storage};
+use std::ptr::null_mut;
 
 /// An upper bound for typical canonical address lengths (e.g. 20 in Cosmos SDK/Ethereum or 32 in Nano/Substrate)
 const CANONICAL_ADDRESS_BUFFER_LENGTH: usize = 32;
@@ -69,32 +70,24 @@ impl ReadonlyStorage for ExternalStorage {
         end: Option<&[u8]>,
         order: Order,
     ) -> Box<dyn Iterator<Item = KV>> {
-        let order = order as i32;
-
-        // There is lots of gotchas on turning options into regions for FFI, thus this design
-        // See: https://github.com/CosmWasm/cosmwasm/pull/509
-        // Note: start and end (Regions) must remain in scope as long as the start_ptr / end_ptr do
-        let iterator_id = match (start, end) {
-            (None, None) => unsafe { db_scan(0, 0, order) },
-            (Some(s), None) => {
-                let start = build_region(s);
-                let start_ptr = &*start as *const Region as u32;
-                unsafe { db_scan(start_ptr, 0, order) }
-            }
-            (None, Some(e)) => {
-                let end = build_region(e);
-                let end_ptr = &*end as *const Region as u32;
-                unsafe { db_scan(0, end_ptr, order) }
-            }
-            (Some(s), Some(e)) => {
-                let start = build_region(s);
-                let start_ptr = &*start as *const Region as u32;
-                let end = build_region(e);
-                let end_ptr = &*end as *const Region as u32;
-                unsafe { db_scan(start_ptr, end_ptr, order) }
-            }
+        let start = start.map(|s| build_region(s));
+        let start_ptr = match start {
+            Some(reg) => Box::into_raw(reg),
+            None => null_mut(),
         };
+        let end = end.map(|e| build_region(e));
+        let end_ptr = match end {
+            Some(reg) => Box::into_raw(reg),
+            None => null_mut(),
+        };
+        let iterator_id = unsafe { db_scan(start_ptr as u32, end_ptr as u32, order as i32) };
         let iter = ExternalIterator { iterator_id };
+        if start_ptr != null_mut() {
+            unsafe { Box::from_raw(start_ptr); }
+        }
+        if end_ptr != null_mut() {
+            unsafe { Box::from_raw(end_ptr); }
+        }
         Box::new(iter)
     }
 }
