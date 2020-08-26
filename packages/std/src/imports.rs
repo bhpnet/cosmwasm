@@ -83,10 +83,14 @@ impl ReadonlyStorage for ExternalStorage {
         let iterator_id = unsafe { db_scan(start_ptr as u32, end_ptr as u32, order as i32) };
         let iter = ExternalIterator { iterator_id };
         if start_ptr != null_mut() {
-            unsafe { Box::from_raw(start_ptr); }
+            unsafe {
+                Box::from_raw(start_ptr);
+            }
         }
         if end_ptr != null_mut() {
-            unsafe { Box::from_raw(end_ptr); }
+            unsafe {
+                Box::from_raw(end_ptr);
+            }
         }
         Box::new(iter)
     }
